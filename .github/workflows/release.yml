@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v6
+
+        - name: Login to Docker Hub
+          uses: docker/login-action@v3
+          with:
+            registry: ${{ vars.CONTAINER_REGISTRY_URL }}
+            username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
+            password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+
+        - name: Build and push
+          uses: docker/build-push-action@v6 #
+          with:
+            context: "."
+            push: true
+            tags: ${{ vars.CONTAINER_REGISTRY_URL }}/qiita-apprun-github-actions-guid:${{ github.sha }}
+
+        - name: Deploy on AppRun Shared
+          id: apprun
+          uses: sundaypeople/sakura-apprun-deploy@v0.0.4
+          with:
+            access_token: ${{ secrets.APPRUN_ACCESS_TOKEN }}
+            access_secret: ${{ secrets.APPRUN_ACCESS_SECRET }}
+            application_name: qiita-apprun-github-actions-guid
+            image: ${{ vars.CONTAINER_REGISTRY_URL }}/qiita-apprun-github-actions-guid:${{ github.sha }}
+            container_registry_username: ${{ vars.CONTAINER_REGISTRY_USERNAME }}
+            container_registry_password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+
+            port: 8080
+            min_scale: 0
+            max_scale: 1
+
+        - name: Show URL
+          run: echo "URL = ${{ steps.apprun.outputs.public_url }}"
